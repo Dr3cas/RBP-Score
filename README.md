@@ -61,6 +61,7 @@ The workflow is designed to integrate complementary analyses:
 ├── config/            # Configuration files
 ├── data/              # Input datasets (reference RBPs, query genomes)
 ├── docs/              # Reports and project documentation
+│   └── manuscript/     # LaTeX files (.tex, .bib, figures)
 ├── results/           # Output results and scoring tables
 ├── scripts/           # Custom scripts for analysis and scoring
 ├── workflow/          # Snakemake pipeline files
