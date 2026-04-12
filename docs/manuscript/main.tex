@@ -1,0 +1,187 @@
+\documentclass[runningheads]{llncs}
+
+\usepackage[backend=biber,style=numeric, sorting=none]{biblatex}
+
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+%\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{array}
+\usepackage{makecell}
+\usepackage{tabularray}
+\UseTblrLibrary{booktabs}
+\addbibresource{references.bib}
+
+\setlist[itemize]{leftmargin=*, nosep}
+\setlist[enumerate]{leftmargin=*, nosep}
+
+\begin{document}
+
+\title{RBP-Score: An integrative bioinformatic pipeline for the identification of phage receptor-binding proteins}
+\titlerunning{RBP-Score pipeline for phage RBPs}
+
+\author{André Gomes\inst{1}, Sílvio Santos\inst{1}}
+\authorrunning{A. Gomes and S. Santos}
+
+\institute{Centre of Biological Engineering, University of Minho\\
+Braga, Portugal\\
+\email{pg59751@uminho.pt}}
+
+
+
+\maketitle
+
+\begin{abstract}
+Bacteriophages (phages) are among the most predominant and genetically diverse biological entities on Earth. Phages are viruses that infect bacteria and encode numerous proteins with potential biotechnological application. Phage host specificity is primarily determined by adsorption, a process mediated by receptor-binding proteins (RBPs) located on virion structures that recognize bacterial surface receptors. Despite their relevance for diagnostics and phage engineering, RBPs remain challenging to identify computationally due to their high sequence diversity and limited conservation, which constrain homology-based approaches. This study presents RBP-Score, an integrative bioinformatic pipeline that combines a curated reference database of experimentally validated RBPs with a reproducible analysis framework for the identification and prioritization of candidate RBPs in phage genomes. The pipeline integrates sequence similarity, evolutionary distance estimation, and structural comparison of predicted AlphaFold models within a weighted scoring scheme to rank candidates according to multi-layered evidence. By leveraging complementary sources of information, RBP-Score aims to improve the consistency and sensitivity of RBP detection, particularly for highly divergent proteins.
+
+
+\keywords{Bacteriophages \and Receptor Binding Proteins \and Bioinformatic Pipeline}
+\end{abstract}
+
+\newpage
+
+\section{Bacteriophages and host specificity}
+\subsection{Biological role and abundance of phages}
+
+Phages are widely distributed across diverse environments, including marine ecosystems, soil, and host-associated microbiomes, where they play a central role in shaping microbial population dynamics. Through infection and lysis of bacterial cells, phages regulate bacterial communities and influence microbial evolution \cite{hatfull2015}.
+
+This ecological impact is ultimately driven by their ability to infect susceptible hosts and replicate efficiently within bacterial cells. Phage replication depends on successful infection, typically initiated by recognition and attachment of the phage particle to bacterial surface receptors, followed by genome injection into the host cell. Once inside, the host cellular machinery is redirected to produce viral components, assemble new virions, and ultimately release them through host cell lysis \cite{hatfull2015}.
+
+In parallel with these biological insights, advances in sequencing technologies and genomic analysis have accelerated the exploration of phage diversity and the functional characterization of phage-encoded proteins, enabling systematic investigation of molecular determinants of phage--host recognition \cite{santos2018}.
+
+\subsection{Phage--host recognition and specificity}
+
+The interaction between phages and their bacterial hosts is initiated by a highly specific process known as phage adsorption, which involves binding of viral structural components to receptors on the bacterial surface and constitutes a primary determinant of phage--host range \cite{silva2016}.
+
+Host recognition is mediated by receptor binding proteins (RBPs), which are virion-associated proteins typically located at distal structures of tailed phages, such as tail fibers, tail spikes or baseplate components. These proteins mediate direct interaction with a wide range of bacterial surface receptors, including lipopolysaccharides, outer membrane proteins, capsular polysaccharides, teichoic acids, pili and flagella \cite{silva2016,latka2019}.
+
+Adsorption often follows a multistep mechanism involving an initial reversible interaction, followed by irreversible binding to a specific receptor, which enables genome injection into the host cell. The molecular specificity of this interaction largely defines the host range of a phage, although successful infection may also depend on intracellular defense mechanisms such as restriction--modification systems or CRISPR-Cas immunity \cite{silva2016,labrie2010}.
+
+Because RBPs directly interact with bacterial surface receptors, they are subject to strong evolutionary pressure and therefore frequently exhibit high sequence diversity. Despite this variability, RBPs often share common structural and functional features and tend to display modular architectures, with regions involved in virion attachment/structural stability and modules associated with receptor recognition and binding \cite{latka2019,latka2017}.
+
+This combination of specificity and modularity has driven the application of RBPs. Their affinity for defined bacterial receptors supports the development of biosensors and targeted detection systems \cite{costa2022,klumpp2023}. In addition, modification or exchange of RBPs can be used to alter phage host range in phage engineering strategies \cite{santos2018,klumpp2023}. Together, these characteristics highlight RBPs as central determinants of phage--host specificity and as key targets for both fundamental and applied research.
+
+\section{Computational approaches for RBP identification}
+
+The rapid expansion of phage genomic data has outpaced experimental functional characterization, resulting in a large proportion of predicted proteins lacking informative annotations. This limitation is particularly evident for highly diverse and poorly conserved proteins, reducing the sensitivity of homology-based identification strategies \cite{hatfull2015,cantu2020}. RBPs exemplify this challenge: their modularity and sequence divergence can lead to inconsistent or missing annotations and complicate systematic computational detection \cite{latka2019,boeckaerts2022}.
+
+To mitigate these challenges, several computational approaches have been developed to support the identification of RBPs and tail-associated proteins in phage genomes (Table~\ref{tab:rbp_tools}). These tools differ in the information they rely on, including sequence-derived features, genome organization, and structure-aware analyses, reflecting the diversity of current computational strategies.
+
+\begin{table}[htbp]
+\caption{Summary of computational tools/models specifically designed for identifying phage RBPs and tail-associated proteins.}
+\label{tab:rbp_tools}
+\centering
+\scriptsize
+
+\begin{tblr}{
+  width=\textwidth,
+  colspec={|Q[c,m,wd=0.30\textwidth]|Q[c,m,wd=0.60\textwidth]|},
+  hlines,
+  vlines,
+  row{1} = {font=\bfseries},
+  rows = {valign=m, halign=c},
+}
+Tool / model & Main contribution \\
+
+PhANNs
+& Multi-class classification of phage structural proteins based on sequence-derived features \\
+
+PhageTailFinder
+& Identification of tail modules and localization of tail-associated proteins using genome organization \\
+
+Boeckaerts pipeline
+& RBP detection combining profile HMM-based domain recognition with supervised classification \\
+
+PhageRBPdetect
+& Implementation of domain-based and machine learning approaches for RBP identification \\
+
+RBPseg
+& Structural segmentation of tail fiber proteins to support domain-level analysis and functional interpretation \\
+
+\end{tblr}
+\end{table}
+
+More broadly, machine learning-based tools such as PhANNs classify phage proteins into structural categories based on sequence-derived features, enabling rapid prioritization of candidates likely associated with virion structures, including tail fibers \cite{cantu2020}. Complementarily, tools such as PhageTailFinder use hidden Markov models to identify tail-associated proteins from predicted coding regions, narrowing the search space to candidates potentially involved in host recognition \cite{zhou2023}.
+
+More targeted approaches focus directly on RBP detection. For example, Boeckaerts et al. (2022) combined profile Hidden Markov Models (HMMs) with supervised learning to identify RBPs based on domain composition and sequence features \cite{boeckaerts2022}. This approach is also implemented in publicly available tools such as PhageRBPdetect, which provide practical implementations of domain-based and machine learning strategies for RBP identification.
+
+Structure-based approaches have become increasingly relevant for RBP analysis, particularly when sequence similarity is limited. Protein structure prediction methods such as AlphaFold enable the generation of three-dimensional models directly from amino acid sequences, while comparison tools such as DALI allow detection of fold-level similarities even in the absence of significant sequence homology \cite{jumper2021,holm2022}. Methods such as RBPseg further demonstrate the value of this approach by segmenting tail fiber proteins into domains, facilitating improved modeling and functional interpretation \cite{kleinSousa2025}. 
+However, structure-based approaches are typically applied downstream and do not constitute stand-alone prediction frameworks.
+
+Despite these advances, tools are often applied independently, relying on distinct evidence types, leading to variability in sensitivity and specificity, particularly for highly divergent proteins or incomplete reference datasets \cite{boeckaerts2022}. This motivates integrative strategies that combine complementary evidence layers to support more consistent candidate prioritization.
+
+Based on these limitations, this study proposes RBP-Score, an integrative bioinformatic pipeline designed to improve the identification and prioritization of candidate RBPs in phage genomes by combining sequence similarity, evolutionary distance and structural comparison within a unified scoring framework. 
+
+The following section details the curated reference dataset and the reproducible workflow implemented in this project.
+
+\section{Methods}
+
+In response to the methodological limitations outlined above, this study is based on an integrative approach that combines a curated reference database of experimentally validated RBPs with a reproducible pipeline for identifying and prioritizing candidate RBPs in phage genomes. The approach relies on a traceable reference dataset and an automated Snakemake workflow implementing the RBP-Score pipeline. This pipeline integrates sequence similarity, evolutionary distance estimation and structure-based comparison within a weighted evidence framework.
+
+\subsection{Reference database}
+
+A curated reference database of experimentally validated phage RBPs, developed in a previous bioinformatics project, is used as the starting reference dataset in this study.
+
+The current version includes 58 RBPs from 51 bacteriophages and spans multiple morphotypes and bacterial hosts.
+
+Each entry includes sequence data together with phage and protein information, such as accession identifiers, taxonomy, host, annotation and protein boundaries.
+
+The dataset is organized in machine-readable formats, including a protein FASTA file for sequence-based analyses and a tabular file containing the associated information.
+
+In addition to the curated dataset used in this study, publicly available resources such as the PhaRBP database (\url{https://pharbp.ugent.be/}) provide complementary collections of candidate RBPs by integrating sequence, structural and domain-based information from multiple computational approaches. These resources can support data exploration, although their level of curation may vary.
+
+As a potential future development, the dataset could be expanded into a community-driven resource, allowing the integration of newly validated RBPs from the literature. Such an approach would require a curation step to ensure the quality and consistency of the data before inclusion. Similar structured frameworks combining data collection and validation have been explored in related contexts, as in PhageDPO, highlighting the importance of controlled data integration in phage protein studies \cite{vieira2025}.
+
+\subsection{Snakemake pipeline}
+
+The proposed workflow takes as input a FASTA file of predicted proteins from a query phage genome and applies a set of complementary analyses to identify candidate RBPs, including sequence similarity, evolutionary comparison and structural similarity assessment.
+
+The main analytical components are summarized in Table~\ref{tab:rbp_score_components}.
+
+
+\begin{table}[htbp]
+\caption{Summary of analytical components integrated in the RBP-Score pipeline.}
+\label{tab:rbp_score_components}
+\centering
+\scriptsize
+
+\begin{tblr}{
+  width=\textwidth,
+  colspec={|Q[c,m,wd=0.28\textwidth]|Q[c,m,wd=0.28\textwidth]|Q[c,m,wd=0.40\textwidth]|},
+  hlines,
+  vlines,
+  row{1} = {font=\bfseries},
+  rows = {valign=m, halign=c},
+}
+Evidence layer & Method / tool & Main role \\
+
+Sequence similarity
+& BLASTp
+& Identification of proteins with similarity to reference RBPs \\
+
+Evolutionary analysis
+& MUSCLE + distance metrics
+& Assessment of sequence divergence and evolutionary relationships \\
+
+Structural analysis
+& AlphaFold + DALI
+& Detection of structural similarity to known RBPs \\
+
+\end{tblr}
+\end{table}
+
+
+Sequence-based screening is used to identify proteins with significant similarity to reference RBPs, defining an initial candidate set \cite{altschul1990}. Selected candidates are then aligned with reference RBPs to estimate sequence divergence and evolutionary relationships \cite{edgar2004}.
+
+Structural comparison is subsequently used to evaluate fold-level similarity between candidate proteins and known RBPs, supporting the identification of distant homologs \cite{jumper2021,holm2022}. Reference RBP structures are precomputed using AlphaFold and stored in the reference dataset, avoiding the need for repeated structure prediction during comparative analyses.
+
+These complementary evidence layers are intended to be integrated into a scoring framework to prioritize candidate RBPs, where higher scores reflect stronger and more consistent support across the different analytical approaches. 
+
+In addition to the overall score, partial scores are derived from each analytical component (sequence similarity, evolutionary comparison and structural similarity), allowing the relative contribution of each evidence layer to be assessed. This enables a more informed interpretation of the results and supports transparent prioritization of candidate RBPs based on multiple complementary evidence layers.
+
+\printbibliography
+
+\end{document}
