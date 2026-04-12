@@ -58,10 +58,10 @@ The workflow is designed to integrate complementary analyses:
 ## Repository Organization
 
 ```bash
-├── data/              # Input datasets (reference RBPs, query genomes)
-├── workflow/          # Snakemake pipeline files
-├── scripts/           # Custom scripts for analysis and scoring
 ├── config/            # Configuration files
-├── results/           # Output results and scoring tables
+├── data/              # Input datasets (reference RBPs, query genomes)
 ├── docs/              # Reports and project documentation
+├── results/           # Output results and scoring tables
+├── scripts/           # Custom scripts for analysis and scoring
+├── workflow/          # Snakemake pipeline files
 └── README.md
