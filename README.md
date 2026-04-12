@@ -1,4 +1,3 @@
-# RBP-Score
 # RBP-Score: A Bioinformatics Pipeline for Phage Receptor-Binding Protein Discovery
 
 This repository contains the code, datasets, and documentation developed for a bioinformatics project focused on detecting and ranking receptor-binding proteins (RBPs) in bacteriophages.
