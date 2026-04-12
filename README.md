@@ -43,7 +43,7 @@ The workflow is designed to integrate complementary analyses:
 
 ---
 
-## Technologies Used
+## Computacional Tools
 
 - Python  
 - Snakemake  
