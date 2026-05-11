@@ -1,0 +1,132 @@
+from pathlib import Path
+
+
+def sanitize_id(qid):
+    return qid.replace("|", "_").replace("/", "_").replace("\\", "_")
+
+
+def get_query_ids():
+    query_file = Path("data/query.fasta")
+    ids = []
+
+    with open(query_file) as f:
+        for line in f:
+            if line.startswith(">"):
+                qid = line[1:].strip().split()[0]
+                ids.append(sanitize_id(qid))
+
+    return ids
+
+
+QUERY_IDS = get_query_ids()
+
+
+rule all:
+    input:
+        "results/blast_results.tsv",
+        "results/alignment_inputs/alignment_inputs_summary.tsv",
+        expand("results/alignment_inputs/{query}.fasta", query=QUERY_IDS),
+        expand("results/alignments/{query}.aligned.fasta", query=QUERY_IDS),
+        expand("results/trees/{query}.tree.nwk", query=QUERY_IDS),
+        expand("results/trees/{query}.tree_status.tsv", query=QUERY_IDS),
+        "results/rbpscore/final_rbpscore.tsv"
+
+rule makeblastdb:
+    input:
+        fasta="data/rbp_db.fasta"
+    output:
+        "db/rbp_db.pin",
+        "db/rbp_db.psq",
+        "db/rbp_db.phr"
+    shell:
+        """
+        makeblastdb -in {input.fasta} -dbtype prot -out db/rbp_db
+        """
+
+
+rule blastp:
+    input:
+        query="data/query.fasta",
+        db="db/rbp_db.pin"
+    output:
+        "results/blast_results.tsv"
+    shell:
+        """
+        echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore\tqlen" > {output}
+
+        blastp \
+            -query {input.query} \
+            -db db/rbp_db \
+            -evalue 1e-5 \
+            -max_target_seqs 200 \
+            -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen" \
+            >> {output}
+        """
+
+
+rule prepare_alignment_inputs:
+    input:
+        blast="results/blast_results.tsv",
+        query="data/query.fasta",
+        db_fasta="data/rbp_db.fasta"
+    output:
+        summary="results/alignment_inputs/alignment_inputs_summary.tsv",
+        fastas=expand("results/alignment_inputs/{query}.fasta", query=QUERY_IDS)
+    shell:
+        """
+        python3 scripts/prepare_alignment_inputs.py \
+        {input.blast} {input.query} {input.db_fasta} results/alignment_inputs
+        """
+
+
+rule muscle_alignment:
+    input:
+        fasta="results/alignment_inputs/{query}.fasta",
+        summary="results/alignment_inputs/alignment_inputs_summary.tsv"
+    output:
+        "results/alignments/{query}.aligned.fasta"
+    shell:
+        """
+        nseq=$(grep -c ">" {input.fasta})
+
+        if [ "$nseq" -lt 2 ]; then
+            echo "Only one sequence found in {input.fasta}; copying input to output without MUSCLE alignment."
+            cp {input.fasta} {output}
+        else
+            muscle -align {input.fasta} -output {output} -quiet
+        fi
+        """
+
+rule fasttree:
+    input:
+        alignment="results/alignments/{query}.aligned.fasta"
+    output:
+        tree="results/trees/{query}.tree.nwk",
+        status="results/trees/{query}.tree_status.tsv"
+    run:
+        import subprocess
+        from pathlib import Path
+
+        Path("results/trees").mkdir(parents=True, exist_ok=True)
+
+        nseq = int(
+            subprocess.check_output(
+                f"grep -c '>' {input.alignment}",
+                shell=True
+            ).decode().strip()
+        )
+
+        if nseq < 2:
+            with open(output.tree, "w") as tree_out:
+                tree_out.write("NO_TREE\n")
+
+            with open(output.status, "w") as status_out:
+                status_out.write("query\tn_sequences\ttree_status\n")
+                status_out.write(f"{wildcards.query}\t{nseq}\tno_tree_insufficient_sequences\n")
+
+        else:
+            shell("FastTree {input.alignment} > {output.tree}")
+
+            with open(output.status, "w") as status_out:
+                status_out.write("query\tn_sequences\ttree_status\n")
+                status_out.write(f"{wildcards.query}\t{nseq}\ttree_generated\n")
