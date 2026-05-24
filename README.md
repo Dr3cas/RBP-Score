@@ -49,8 +49,8 @@ The workflow is designed to integrate complementary analyses:
 - Snakemake  
 - BLASTp  
 - MUSCLE  
-- AlphaFold  
-- DALI  
+- ColabFold  
+- Foldseek  
 - FASTA files and protein datasets  
 
 ---
