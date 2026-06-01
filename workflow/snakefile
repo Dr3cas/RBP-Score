@@ -1,18 +1,32 @@
+configfile: "config/config.yaml"
+
 from pathlib import Path
 
 
 def sanitize_id(qid):
-    return qid.replace("|", "_").replace("/", "_").replace("\\", "_")
+    return qid.replace("|", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
 
 def get_query_ids():
-    query_file = Path("data/query.fasta")
+    query_file = Path("data/query_clean.fasta")
+    if not query_file.exists():
+        query_file = Path("data/query.fasta")
+
     ids = []
 
     with open(query_file) as f:
         for line in f:
             if line.startswith(">"):
-                qid = line[1:].strip().split()[0]
+                header = line[1:].strip().replace(" ", "_").split()[0]
+                parts = header.split("|")
+
+                parts_no_label = [
+                    p for p in parts
+                    if not p.lower().startswith("label=")
+                ]
+
+                qid = "|".join(parts_no_label)
+                qid = qid.replace("unknow_", "unknown_")
                 ids.append(sanitize_id(qid))
 
     return ids
@@ -23,110 +37,264 @@ QUERY_IDS = get_query_ids()
 
 rule all:
     input:
+        "data/rbp_db_annotated.fasta",
+        "data/query_clean.fasta",
         "results/blast_results.tsv",
-        "results/alignment_inputs/alignment_inputs_summary.tsv",
-        expand("results/alignment_inputs/{query}.fasta", query=QUERY_IDS),
-        expand("results/alignments/{query}.aligned.fasta", query=QUERY_IDS),
-        expand("results/trees/{query}.tree.nwk", query=QUERY_IDS),
-        expand("results/trees/{query}.tree_status.tsv", query=QUERY_IDS),
-        "results/rbpscore/final_rbpscore.tsv"
+        expand("results/query_fastas/{query}.fasta", query=QUERY_IDS),
+        "results/phylogeny/outgroup.validated.txt",
+        "results/phylogeny/global_phylogeny_input.fasta",
+        "results/alignments/global_alignment.fasta",
+        "results/trees/global_tree_unrooted.nwk",
+        "results/trees/global_tree_rooted.nwk",
+        "results/trees_png/global_tree_rooted.png",
+        "results/query_structures/query_pdb_summary.tsv",
+        "results/foldseek/foldseek_structural_results.tsv",
+        "results/rbpscore/final_rbpscore_summary.tsv",
+        "results/rbpscore/detailed_rbpscore.tsv",
+        expand("results/rbpscore/details/{query}.details.tsv", query=QUERY_IDS)
+
+
+rule build_rbp_db_with_morphotype:
+    input:
+        excel="data/RBP_validated_final.xlsx",
+        outgroup="data/outgroup.fasta"
+    output:
+        fasta="data/rbp_db_annotated.fasta",
+        blast_fasta="data/blast_db_with_outgroups.fasta",
+        metadata="results/database/rbp_db_metadata.tsv"
+    shell:
+        """
+        python3 scripts/build_rbp_db_with_morphotype.py \
+            --excel {input.excel} \
+            --outgroup {input.outgroup} \
+            --output {output.fasta} \
+            --blast-output {output.blast_fasta} \
+            --metadata {output.metadata}
+        """
+
+
+
+rule clean_query_fasta:
+    input:
+        "data/query.fasta"
+    output:
+        "data/query_clean.fasta"
+    shell:
+        """
+        python3 scripts/clean_query_fasta.py {input} {output}
+        """
 
 rule makeblastdb:
     input:
-        fasta="data/rbp_db.fasta"
+        fasta="data/blast_db_with_outgroups.fasta"
     output:
         "db/rbp_db.pin",
         "db/rbp_db.psq",
         "db/rbp_db.phr"
     shell:
         """
+        mkdir -p db
         makeblastdb -in {input.fasta} -dbtype prot -out db/rbp_db
         """
 
-
 rule blastp:
     input:
-        query="data/query.fasta",
+        query="data/query_clean.fasta",
         db="db/rbp_db.pin"
     output:
         "results/blast_results.tsv"
+    threads: 4
     shell:
         """
-        echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore\tqlen" > {output}
+        mkdir -p results
+
+        echo -e "qseqid\\tsseqid\\tpident\\tlength\\tmismatch\\tgapopen\\tqstart\\tqend\\tsstart\\tsend\\tevalue\\tbitscore\\tqlen" > {output}
 
         blastp \
             -query {input.query} \
             -db db/rbp_db \
-            -evalue 1e-5 \
-            -max_target_seqs 200 \
+            -out results/blast_results.tmp.tsv \
             -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen" \
-            >> {output}
+            -evalue 1000 \
+            -max_target_seqs 10000 \
+            -max_hsps 1 \
+            -seg yes \
+            -soft_masking true \
+            -num_threads {threads}
+
+        cat results/blast_results.tmp.tsv >> {output}
+        rm -f results/blast_results.tmp.tsv
         """
 
 
-rule prepare_alignment_inputs:
+rule split_query_fasta:
+    input:
+        "data/query_clean.fasta"
+    output:
+        expand("results/query_fastas/{query}.fasta", query=QUERY_IDS)
+    shell:
+        """
+        python3 scripts/split_query_fasta.py {input} results/query_fastas
+        """
+
+
+rule validate_outgroup_fasta:
+    input:
+        "data/outgroup.fasta"
+    output:
+        "results/phylogeny/outgroup.validated.txt"
+    shell:
+        """
+        python3 scripts/validate_outgroup_fasta.py {input} {output} --min-n 4 --max-n 5
+        """
+
+
+rule build_global_phylogeny_input:
+    input:
+        db="data/rbp_db_annotated.fasta",
+        query="data/query_clean.fasta",
+        outgroup="data/outgroup.fasta",
+        validation="results/phylogeny/outgroup.validated.txt"
+    output:
+        "results/phylogeny/global_phylogeny_input.fasta"
+    shell:
+        """
+        python3 scripts/build_global_phylogeny_input.py \
+            --db {input.db} \
+            --query {input.query} \
+            --outgroup {input.outgroup} \
+            --output {output}
+        """
+
+
+rule muscle_global_alignment:
+    input:
+        "results/phylogeny/global_phylogeny_input.fasta"
+    output:
+        "results/alignments/global_alignment.fasta"
+    threads: 4
+    shell:
+        """
+        mkdir -p results/alignments
+        muscle -align {input} -output {output} -quiet
+        """
+
+
+rule fasttree_global:
+    input:
+        "results/alignments/global_alignment.fasta"
+    output:
+        "results/trees/global_tree_unrooted.nwk"
+    threads: 4
+    shell:
+        """
+        mkdir -p results/trees
+        FastTree {input} > {output}
+        """
+
+
+rule root_global_tree:
+    input:
+        tree="results/trees/global_tree_unrooted.nwk",
+        outgroup="data/outgroup.fasta"
+    output:
+        "results/trees/global_tree_rooted.nwk"
+    shell:
+        """
+        python3 scripts/root_tree_with_outgroup.py \
+            --tree {input.tree} \
+            --outgroup {input.outgroup} \
+            --output {output}
+        """
+
+
+rule render_global_tree_png:
+    input:
+        "results/trees/global_tree_rooted.nwk"
+    output:
+        "results/trees_png/global_tree_rooted.png"
+    shell:
+        """
+        python3 scripts/render_tree_png.py \
+            {input} \
+            {output} \
+            --title "Global phylogenetic tree: RBPs, queries and non-RBP tail outgroups"
+        """
+
+rule predict_query_structures:
+    input:
+        expand("results/query_fastas/{query}.fasta", query=QUERY_IDS),
+        tree_png="results/trees_png/global_tree_rooted.png",
+    output:
+        summary="results/query_structures/query_pdb_summary.tsv"
+    threads: 4
+    shell:
+        """
+        python3 scripts/run_colabfold_clean_queries.py \
+            --gpu {config[colabfold][gpu]} \
+            --input-dir results/query_fastas \
+            --raw-dir results/query_structures_raw \
+            --pdb-dir results/query_structures \
+            --logs-dir logs/colabfold_queries \
+            --summary {output.summary} \
+            --num-models {config[colabfold][num_models]} \
+            --num-recycle {config[colabfold][num_recycle]} \
+            --msa-mode {config[colabfold][msa_mode]}
+        """
+
+rule foldseek_structural_search:
+    input:
+        query_summary="results/query_structures/query_pdb_summary.tsv"
+    output:
+        "results/foldseek/foldseek_structural_results.tsv"
+    threads: 4
+    shell:
+        """
+        mkdir -p results/foldseek
+        rm -rf results/foldseek/tmp
+
+        echo -e "query\\ttarget\\tevalue\\tbits\\talntmscore\\tqtmscore\\tttmscore\\trmsd" > results/foldseek/foldseek_structural_results.tsv
+
+        foldseek easy-search \
+            results/query_structures \
+            reference_structures/pdb \
+            results/foldseek/foldseek_tmp.tsv \
+            results/foldseek/tmp \
+            --alignment-type {config[foldseek][alignment_type]} \
+            -e {config[foldseek][evalue]} \
+            --max-seqs {config[foldseek][max_seqs]} \
+            --format-output "query,target,evalue,bits,alntmscore,qtmscore,ttmscore,rmsd"
+
+        cat results/foldseek/foldseek_tmp.tsv >> results/foldseek/foldseek_structural_results.tsv
+
+        rm -f results/foldseek/foldseek_tmp.tsv
+        rm -rf results/foldseek/tmp
+        """
+
+
+rule calculate_rbpscore:
     input:
         blast="results/blast_results.tsv",
-        query="data/query.fasta",
-        db_fasta="data/rbp_db.fasta"
+        query="data/query_clean.fasta",
+        db="data/rbp_db_annotated.fasta",
+        tree="results/trees/global_tree_rooted.nwk",
+        foldseek="results/foldseek/foldseek_structural_results.tsv",
+        outgroup="data/outgroup.fasta"
     output:
-        summary="results/alignment_inputs/alignment_inputs_summary.tsv",
-        fastas=expand("results/alignment_inputs/{query}.fasta", query=QUERY_IDS)
+        summary="results/rbpscore/final_rbpscore_summary.tsv",
+        detailed="results/rbpscore/detailed_rbpscore.tsv",
+        details=expand("results/rbpscore/details/{query}.details.tsv", query=QUERY_IDS)
     shell:
         """
-        python3 scripts/prepare_alignment_inputs.py \
-        {input.blast} {input.query} {input.db_fasta} results/alignment_inputs
+        python3 scripts/calculate_rbpscore.py \
+            --blast {input.blast} \
+            --query {input.query} \
+            --db {input.db} \
+            --tree {input.tree} \
+            --foldseek {input.foldseek} \
+            --outgroup {input.outgroup} \
+            --summary {output.summary} \
+            --detailed {output.detailed} \
+            --details-dir results/rbpscore/details \
+            --config config/config.yaml
         """
-
-
-rule muscle_alignment:
-    input:
-        fasta="results/alignment_inputs/{query}.fasta",
-        summary="results/alignment_inputs/alignment_inputs_summary.tsv"
-    output:
-        "results/alignments/{query}.aligned.fasta"
-    shell:
-        """
-        nseq=$(grep -c ">" {input.fasta})
-
-        if [ "$nseq" -lt 2 ]; then
-            echo "Only one sequence found in {input.fasta}; copying input to output without MUSCLE alignment."
-            cp {input.fasta} {output}
-        else
-            muscle -align {input.fasta} -output {output} -quiet
-        fi
-        """
-
-rule fasttree:
-    input:
-        alignment="results/alignments/{query}.aligned.fasta"
-    output:
-        tree="results/trees/{query}.tree.nwk",
-        status="results/trees/{query}.tree_status.tsv"
-    run:
-        import subprocess
-        from pathlib import Path
-
-        Path("results/trees").mkdir(parents=True, exist_ok=True)
-
-        nseq = int(
-            subprocess.check_output(
-                f"grep -c '>' {input.alignment}",
-                shell=True
-            ).decode().strip()
-        )
-
-        if nseq < 2:
-            with open(output.tree, "w") as tree_out:
-                tree_out.write("NO_TREE\n")
-
-            with open(output.status, "w") as status_out:
-                status_out.write("query\tn_sequences\ttree_status\n")
-                status_out.write(f"{wildcards.query}\t{nseq}\tno_tree_insufficient_sequences\n")
-
-        else:
-            shell("FastTree {input.alignment} > {output.tree}")
-
-            with open(output.status, "w") as status_out:
-                status_out.write("query\tn_sequences\ttree_status\n")
-                status_out.write(f"{wildcards.query}\t{nseq}\ttree_generated\n")
