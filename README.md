@@ -36,7 +36,7 @@ The workflow is designed to integrate complementary analyses:
   Multiple sequence alignment and distance calculation to evaluate divergence  
 
 - **Structure-based comparison**  
-  Structural similarity assessment using AlphaFold models and tools like DALI  
+  Structural similarity assessment using ColabFold models and tools like Foldseek  
 
 - **Scoring system**  
   Integration of all evidence into a global **RBP-Score**, allowing ranking of candidates  
