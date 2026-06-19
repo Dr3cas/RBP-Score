@@ -145,7 +145,7 @@ rule validate_outgroup_fasta:
         "results/phylogeny/outgroup.validated.txt"
     shell:
         """
-        python3 scripts/validate_outgroup_fasta.py {input} {output} --min-n 4 --max-n 5
+        python3 scripts/validate_outgroup_fasta.py {input} {output} --min-n 3 --max-n 7
         """
 
 
@@ -218,7 +218,7 @@ rule render_global_tree_png:
         python3 scripts/render_tree_png.py \
             {input} \
             {output} \
-            --title "Global phylogenetic tree: RBPs, queries and non-RBP tail outgroups"
+            --title "Global phylogenetic tree: RBPs, queries and non-RBP outgroups"
         """
 
 rule predict_query_structures:
