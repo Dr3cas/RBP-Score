@@ -53,11 +53,18 @@ RBP-Score/
 │   ├── query_clean.fasta
 │   └── rbp_db_annotated.fasta
 ├── db/
-│   └── rbp_db.*                  # BLAST database files
+│   └── rbp_db.*
 ├── docs/
 │   ├── manuscript/
+│   │   ├── main.tex
+│   │   ├── references.bib
+│   │   ├── global_tree_rooted.png
+│   │   └── eval_transform.png
 │   ├── RBPScore_FINAL.pptx
-│   └── project reports / supporting documents
+│   ├── RBPScore_Final_Submission_19-06.pdf
+│   ├── RBP_Score_pipeline_for_phage_RBPs_1.pdf
+│   ├── Script_Projeto.odt
+│   └── Tema Projeto em Bioinformatica_SBS(2026).pdf
 ├── reference_structures/
 │   ├── input_fastas/
 │   └── pdb/
