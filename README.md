@@ -154,6 +154,25 @@ outgroup_penalty:
   blast: 0.10
   phylogeny: 0.15
   structural: 0.20
+
+foldseek:
+  evalue: 10
+  max_seqs: 1000
+  alignment_type: 1
+
+colabfold:
+  gpu: 0
+  num_models: 1
+  num_recycle: 1
+  msa_mode: mmseqs2_uniref_env
+
+outgroup_filters:
+  min_identity: 20.0
+  min_length: 10
+  max_evalue: 1000.0
+
+normalization:
+  evalue_max_log: 150.0
 ```
 
 These weights are configurable and exploratory in the current prototype.
