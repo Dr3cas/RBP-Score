@@ -1,13 +1,16 @@
 \documentclass[runningheads]{llncs}
 
-\usepackage[backend=biber,style=numeric, sorting=none]{biblatex}
-
 \usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[backend=biber,style=numeric,sorting=none,sortcites=true]{biblatex}
 \usepackage{graphicx}
-%\usepackage{amsmath}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage{booktabs}
 \usepackage{enumitem}
-\usepackage{hyperref}
+\usepackage[hidelinks,hypertexnames=false]{hyperref}
+\usepackage{xurl}
 \usepackage{float}
 \usepackage{array}
 \usepackage{makecell}
@@ -17,31 +20,30 @@
 
 \setlist[itemize]{leftmargin=*, nosep}
 \setlist[enumerate]{leftmargin=*, nosep}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
 
 \begin{document}
+\raggedbottom
 
-\title{RBP-Score: An integrative bioinformatic pipeline for the identification of phage receptor-binding proteins}
+\title{RBP-Score: An integrative bioinformatic pipeline for the identification and prioritization of phage receptor-binding proteins}
 \titlerunning{RBP-Score pipeline for phage RBPs}
 
-\author{André Gomes\inst{1}, Sílvio Santos\inst{1}}
+\author{Andr\'e Gomes\inst{1}, S\'ilvio Santos\inst{1}}
 \authorrunning{A. Gomes and S. Santos}
 
 \institute{Centre of Biological Engineering, University of Minho\\
 Braga, Portugal\\
 \email{pg59751@uminho.pt}}
 
-
-
 \maketitle
 
 \begin{abstract}
-Bacteriophages (phages) are among the most predominant and genetically diverse biological entities on Earth. Phages are viruses that infect bacteria and encode numerous proteins with potential biotechnological application. Phage host specificity is primarily determined by adsorption, a process mediated by receptor-binding proteins (RBPs) located on virion structures that recognize bacterial surface receptors. Despite their relevance for diagnostics and phage engineering, RBPs remain challenging to identify computationally due to their high sequence diversity and limited conservation, which constrain homology-based approaches. This study presents RBP-Score, an integrative bioinformatic pipeline that combines a curated reference database of experimentally validated RBPs with a reproducible analysis framework for the identification and prioritization of candidate RBPs in phage genomes. The pipeline integrates sequence similarity, evolutionary distance estimation, and structural comparison of predicted AlphaFold models within a weighted scoring scheme to rank candidates according to multi-layered evidence. By leveraging complementary sources of information, RBP-Score aims to improve the consistency and sensitivity of RBP detection, particularly for highly divergent proteins.
+Bacteriophages (phages) are among the most predominant and genetically diverse biological entities on Earth. Phages are viruses that infect bacteria and encode numerous proteins with potential biotechnological application. Phage host specificity is primarily determined by adsorption, a process mediated by receptor-binding proteins (RBPs) located on virion structures that recognize bacterial surface receptors. Despite their relevance for diagnostics and phage engineering, RBPs remain challenging to identify computationally due to their high sequence diversity and limited conservation, which constrain homology-based approaches. This \textit{in silico} study presents RBP-Score, an integrative bioinformatic pipeline that combines a curated reference database of experimentally validated RBPs with a reproducible analysis framework for the identification and prioritization of candidate RBPs in phage genomes. The pipeline integrates sequence similarity, evolutionary distance estimation, and structural comparison of predicted AlphaFold models within a weighted scoring scheme to rank candidates according to multi-layered evidence. By leveraging complementary sources of information, RBP-Score aims to improve the consistency and accuracy of RBP detection, particularly for highly divergent proteins.
 
-
-\keywords{Bacteriophages \and Receptor Binding Proteins \and Bioinformatic Pipeline}
+\keywords{Bacteriophages \and Receptor Binding Proteins \and Bioinformatic Pipeline \and Foldseek \and Snakemake}
 \end{abstract}
-
-\newpage
 
 \section{Bacteriophages and host specificity}
 \subsection{Biological role and abundance of phages}
@@ -56,7 +58,7 @@ In parallel with these biological insights, advances in sequencing technologies 
 
 The interaction between phages and their bacterial hosts is initiated by a highly specific process known as phage adsorption, which involves binding of viral structural components to receptors on the bacterial surface and constitutes a primary determinant of phage--host range \cite{silva2016}.
 
-Host recognition is mediated by receptor binding proteins (RBPs), which are virion-associated proteins typically located at distal structures of tailed phages, such as tail fibers, tail spikes or baseplate components. These proteins mediate direct interaction with a wide range of bacterial surface receptors, including lipopolysaccharides, outer membrane proteins, capsular polysaccharides, teichoic acids, pili and flagella \cite{silva2016,latka2019}.
+Host recognition is mediated by receptor binding proteins (RBPs), which are virion-associated proteins typically located at distal structures of tailed phages, such as tail fibers, tail spikes or baseplate components. These proteins mediate direct interaction with a wide range of bacterial surface receptors, including lipopolysaccharides, outer membrane proteins, capsular polysaccharides, teichoic acids, pili and flagella \cite{silva2016,latka2019,rai2026}.
 
 Adsorption often follows a multistep mechanism involving an initial reversible interaction, followed by irreversible binding to a specific receptor, which enables genome injection into the host cell. The molecular specificity of this interaction largely defines the host range of a phage, although successful infection may also depend on intracellular defense mechanisms such as restriction--modification systems or CRISPR-Cas immunity \cite{silva2016,labrie2010}.
 
@@ -71,49 +73,34 @@ The rapid expansion of phage genomic data has outpaced experimental functional c
 To mitigate these challenges, several computational approaches have been developed to support the identification of RBPs and tail-associated proteins in phage genomes (Table~\ref{tab:rbp_tools}). These tools differ in the information they rely on, including sequence-derived features, genome organization, and structure-aware analyses, reflecting the diversity of current computational strategies.
 
 \begin{table}[htbp]
-\caption{Summary of computational tools/models specifically designed for identifying phage RBPs and tail-associated proteins.}
+\caption{Computational tools/models relevant to RBP and phage structural protein identification.}
 \label{tab:rbp_tools}
 \centering
 \scriptsize
-
 \begin{tblr}{
-  width=\textwidth,
-  colspec={|Q[c,m,wd=0.30\textwidth]|Q[c,m,wd=0.60\textwidth]|},
+  width=0.92\textwidth,
+  colspec={|Q[c,m,wd=0.27\textwidth]|Q[c,m,wd=0.57\textwidth]|},
   hlines,
   vlines,
   row{1} = {font=\bfseries},
   rows = {valign=m, halign=c},
 }
 Tool / model & Main contribution \\
-
-PhANNs
-& Multi-class classification of phage structural proteins based on sequence-derived features \\
-
-PhageTailFinder
-& Identification of tail modules and localization of tail-associated proteins using genome organization \\
-
-Boeckaerts pipeline
-& RBP detection combining profile HMM-based domain recognition with supervised classification \\
-
-PhageRBPdetect
-& Implementation of domain-based and machine learning approaches for RBP identification \\
-
-RBPseg
-& Structural segmentation of tail fiber proteins to support domain-level analysis and functional interpretation \\
-
+PhANNs \cite{cantu2020} & Classification of phage structural proteins using sequence-derived features \\
+PhageTailFinder \cite{zhou2023} & Detection and annotation of phage tail modules from predicted coding regions \\
+Boeckaerts pipeline / PhageRBPdetect \cite{boeckaerts2022} & RBP identification using profile HMMs and supervised classification \\
+RBPseg \cite{kleinSousa2025} & Structural segmentation of tail fiber proteins to support domain-level interpretation \\
 \end{tblr}
 \end{table}
-
 More broadly, machine learning-based tools such as PhANNs classify phage proteins into structural categories based on sequence-derived features, enabling rapid prioritization of candidates likely associated with virion structures, including tail fibers \cite{cantu2020}. Complementarily, tools such as PhageTailFinder use hidden Markov models to identify tail-associated proteins from predicted coding regions, narrowing the search space to candidates potentially involved in host recognition \cite{zhou2023}.
 
-More targeted approaches focus directly on RBP detection. For example, Boeckaerts et al. (2022) combined profile Hidden Markov Models (HMMs) with supervised learning to identify RBPs based on domain composition and sequence features \cite{boeckaerts2022}. This approach is also implemented in publicly available tools such as PhageRBPdetect, which provide practical implementations of domain-based and machine learning strategies for RBP identification.
+More targeted approaches focus directly on RBP detection. For example, Boeckaerts et al. (2022) combined profile Hidden Markov Models (HMMs) with supervised learning to identify RBPs based on domain composition and sequence features \cite{boeckaerts2022}. This approach is also implemented in publicly available tools such as PhageRBPdetect (GitHub) \url{https://github.com/dimiboeckaerts/PhageRBPdetection}, which provide practical implementations of domain-based and machine learning strategies for RBP identification.
 
-Structure-based approaches have become increasingly relevant for RBP analysis, particularly when sequence similarity is limited. Protein structure prediction methods such as AlphaFold enable the generation of three-dimensional models directly from amino acid sequences, while comparison tools such as DALI allow detection of fold-level similarities even in the absence of significant sequence homology \cite{jumper2021,holm2022}. Methods such as RBPseg further demonstrate the value of this approach by segmenting tail fiber proteins into domains, facilitating improved modeling and functional interpretation \cite{kleinSousa2025}. 
-However, structure-based approaches are typically applied downstream and do not constitute stand-alone prediction frameworks.
+Structure-based approaches have become increasingly relevant for RBP analysis, particularly when sequence similarity is limited. Protein structure prediction methods such as AlphaFold enable the generation of three-dimensional models directly from amino acid sequences, while comparison tools such as DALI allow detection of fold-level similarities even in the absence of significant sequence homology \cite{jumper2021,holm2022}. Foldseek further supports rapid large-scale comparison of predicted or experimental protein structures, making structural evidence more practical for reproducible bioinformatic workflows \cite{vankempen2024}. Methods such as RBPseg further demonstrate the value of this approach by segmenting tail fiber proteins into domains, facilitating improved modeling and functional interpretation \cite{kleinSousa2025}. However, structure-based approaches are typically applied downstream and do not constitute stand-alone prediction frameworks.
 
-Despite these advances, tools are often applied independently, relying on distinct evidence types, leading to variability in sensitivity and specificity, particularly for highly divergent proteins or incomplete reference datasets \cite{boeckaerts2022}. This motivates integrative strategies that combine complementary evidence layers to support more consistent candidate prioritization.
+Despite these advances, tools are often applied independently, relying on distinct evidence types, leading to variability in sensitivity and specificity, particularly for highly divergent proteins or incomplete reference datasets \cite{boeckaerts2022}. In addition, current approaches do not generally provide an integrated comparison in which candidate proteins are scored directly against a curated reference set restricted to experimentally validated RBPs while retaining sequence, phylogenetic and structural evidence as inspectable partial components. This motivates integrative strategies that combine complementary evidence layers to support more consistent candidate prioritization.
 
-Based on these limitations, this study proposes RBP-Score, an integrative bioinformatic pipeline designed to improve the identification and prioritization of candidate RBPs in phage genomes by combining sequence similarity, evolutionary distance and structural comparison within a unified scoring framework. 
+Based on these limitations, this study proposes RBP-Score, an integrative bioinformatic pipeline designed to improve the identification and prioritization of candidate RBPs in phage genomes by combining sequence similarity, evolutionary distance and structural comparison within a unified scoring framework.
 
 The following section details the curated reference dataset and the reproducible workflow implemented in this project.
 
@@ -125,11 +112,11 @@ In response to the methodological limitations outlined above, this study is base
 
 A curated reference database of experimentally validated phage RBPs, developed in a previous bioinformatics project, is used as the starting reference dataset in this study.
 
-The current version includes 58 RBPs from 51 bacteriophages and spans multiple morphotypes and bacterial hosts.
+The current version includes 58 RBPs from 51 bacteriophages and spans multiple morphotypes and bacterial hosts, including Podovirus, Siphovirus and Myovirus labels.
 
 Each entry includes sequence data together with phage and protein information, such as accession identifiers, taxonomy, host, annotation and protein boundaries.
 
-The dataset is organized in machine-readable formats, including a protein FASTA file for sequence-based analyses and a tabular file containing the associated information.
+The dataset is organized in machine-readable formats, including a protein FASTA file for sequence-based analyses and a tabular file containing the associated information. Reference RBP structures are stored as PDB files and used as the structural database for Foldseek searches.
 
 In addition to the curated dataset used in this study, publicly available resources such as the PhaRBP database (\url{https://pharbp.ugent.be/}) provide complementary collections of candidate RBPs by integrating sequence, structural and domain-based information from multiple computational approaches. These resources can support data exploration, although their level of curation may vary.
 
@@ -139,48 +126,363 @@ As a potential future development, the dataset could be expanded into a communit
 
 The proposed workflow takes as input a FASTA file of predicted proteins from a query phage genome and applies a set of complementary analyses to identify candidate RBPs, including sequence similarity, evolutionary comparison and structural similarity assessment.
 
-The main analytical components are summarized in Table~\ref{tab:rbp_score_components}.
-
+The main analytical components are summarized in Table~\ref{tab:pipeline_components}.
 
 \begin{table}[htbp]
-\caption{Summary of analytical components integrated in the RBP-Score pipeline.}
-\label{tab:rbp_score_components}
+\caption{Analytical components integrated in the current RBP-Score workflow.}
+\label{tab:pipeline_components}
 \centering
 \scriptsize
-
 \begin{tblr}{
-  width=\textwidth,
-  colspec={|Q[c,m,wd=0.28\textwidth]|Q[c,m,wd=0.28\textwidth]|Q[c,m,wd=0.40\textwidth]|},
+  width=0.92\textwidth,
+  colspec={|Q[c,m,wd=0.23\textwidth]|Q[c,m,wd=0.24\textwidth]|Q[c,m,wd=0.39\textwidth]|},
+  hlines,
+  vlines,
+  row{1}={font=\bfseries},
+}
+Evidence layer & Method / tool & Main role \\
+Sequence similarity & BLASTp \cite{altschul1990} & Detect similarity between query proteins, reference RBPs and non-RBP outgroups \\
+Evolutionary context & MUSCLE + FastTree \cite{edgar2022,price2010} & Estimate global phylogenetic distances among RBPs, queries and outgroups \\
+Structural similarity & ColabFold + Foldseek \cite{mirdita2022,vankempen2024} & Predict query structures and compare them with reference RBP and outgroup structures \\
+Integrated scoring & RBP-Score script & Combine weighted evidence and apply outgroup-based penalties \\
+\end{tblr}
+\end{table}
+
+Sequence-based screening is used to identify proteins with significant similarity to reference RBPs, defining an initial candidate set \cite{altschul1990}. Selected candidates are then aligned with reference RBPs to estimate sequence divergence and evolutionary relationships \cite{edgar2004}.
+
+Structural comparison is subsequently used to evaluate fold-level similarity between candidate proteins and known RBPs, supporting the identification of distant homologs \cite{jumper2021,holm2022,vankempen2024}. Reference RBP structures are precomputed using AlphaFold and stored in the reference dataset, avoiding the need for repeated structure prediction during comparative analyses.
+
+In addition to the overall score, partial scores are derived from each analytical component (sequence similarity, evolutionary comparison and structural similarity), allowing the relative contribution of each evidence layer to be assessed. This enables a more informed interpretation of the results and supports transparent prioritization of candidate RBPs based on multiple complementary evidence layers.
+
+\subsection{Query and control sequences}
+
+The current test run included six query/control sequences (Table~\ref{tab:queries}): one positive control, one random control, three PhageRBP-like candidate sequences and one capsid-labelled non-RBP control. The capsid query was retained to test expected negative-control behaviour and was not interpreted as an RBP candidate.
+
+\begin{table}[htbp]
+\caption{Query and control sequences used in the current RBP-Score test run.}
+\label{tab:queries}
+\centering
+\scriptsize
+\begin{tblr}{
+  width=0.95\textwidth,
+  colspec={|Q[l,m,wd=0.63\textwidth]|Q[c,m,wd=0.14\textwidth]|Q[c,m,wd=0.10\textwidth]|},
+  hlines,
+  vlines,
+  row{1}={font=\bfseries},
+  rows={valign=m},
+}
+Query identifier & Label & Length (aa) \\
+query1|unknown\_host1|phage\_test1 & random & 298 \\
+query2|unknow\_host2|phage\_test2 & positive & 821 \\
+query3|bacillus\_subtilis|Bacillus\_phage\_Chedec\_11 & pharbp & 862 \\
+query4|unknown\_host|Lactobacillus\_phage\_ViSo\_2018a & pharbp & 840 \\
+query5|Klebsiella\_pneumoniae|Klebsiella & pharbp & 582 \\
+query6|Escherichia|Escherichia\_phage\_phiC120 & outgroup & 529 \\
+\end{tblr}
+\end{table}
+
+\subsection{Non-RBP capsid outgroup design}
+
+Outgroup selection was treated as a methodological control rather than a cosmetic tree-rooting step. Heterogeneous non-RBP proteins selected only by annotation did not form a consistent outgroup branch. The final strategy therefore used homologous capsid/major head proteins, selected by BLASTp from the T4 major head protein seed. This produced a non-RBP set with comparable length, shared functional annotation and sufficient internal homology for multiple sequence alignment.
+
+The final outgroup contained six T4-like Gp23/major head proteins (Table~\ref{tab:outgroups}). These proteins are structurally associated with the phage capsid rather than receptor binding, so they provide negative evidence against the RBP hypothesis. At the same time, their homology reduces the risk that the outgroup fails simply because unrelated proteins cannot be aligned coherently.
+
+\begin{table}[H]
+\caption{Non-RBP capsid/major head outgroups used for tree rooting and outgroup-based penalty.}
+\label{tab:outgroups}
+\centering
+\scriptsize
+\begin{tblr}{
+  width=0.82\textwidth,
+  colspec={|Q[c,m,wd=0.07\textwidth]|
+           Q[l,m,wd=0.24\textwidth]|
+           Q[l,m,wd=0.19\textwidth]|
+           Q[c,m,wd=0.17\textwidth]|
+           Q[c,m,wd=0.07\textwidth]|},
   hlines,
   vlines,
   row{1} = {font=\bfseries},
-  rows = {valign=m, halign=c},
+  rows = {valign=m}
 }
-Evidence layer & Method / tool & Main role \\
-
-Sequence similarity
-& BLASTp
-& Identification of proteins with similarity to reference RBPs \\
-
-Evolutionary analysis
-& MUSCLE + distance metrics
-& Assessment of sequence divergence and evolutionary relationships \\
-
-Structural analysis
-& AlphaFold + DALI
-& Detection of structural similarity to known RBPs \\
-
+ID & Phage & Annotation & Accession & Length \\
+OG1 & Escherichia phage T4 & major head protein & NP\_049787.1 & 528 \\
+OG2 & Escherichia phage phiC120 & major head protein & YP\_010090013.1 & 529 \\
+OG3 & Escherichia phage vB\_EcoM\_VR25 & major head protein & YP\_009209931.1 & 526 \\
+OG4 & Escherichia phage IME08 & major head protein & YP\_003734314.1 & 529 \\
+OG5 & Klebsiella phage vB\_KpnM\_KpV477 & major head protein & YP\_009288862.1 & 526 \\
+OG6 & Enterobacter phage CC31 & major head protein & YP\_004010035.1 & 527 \\
 \end{tblr}
 \end{table}
 
 
-Sequence-based screening is used to identify proteins with significant similarity to reference RBPs, defining an initial candidate set \cite{altschul1990}. Selected candidates are then aligned with reference RBPs to estimate sequence divergence and evolutionary relationships \cite{edgar2004}.
+\subsection{Workflow implementation}
 
-Structural comparison is subsequently used to evaluate fold-level similarity between candidate proteins and known RBPs, supporting the identification of distant homologs \cite{jumper2021,holm2022}. Reference RBP structures are precomputed using AlphaFold and stored in the reference dataset, avoiding the need for repeated structure prediction during comparative analyses.
+The workflow was implemented in Snakemake to support reproducible execution and selective re-running when inputs or parameters change \cite{koster2012}. The implemented rules build an annotated RBP FASTA, add non-RBP outgroups to the BLAST database, clean query identifiers, perform BLASTp searches, construct a global phylogenetic input FASTA, align sequences with MUSCLE, infer a tree with FastTree, root the tree using the outgroup common ancestor, predict query structures with ColabFold and compare structures with Foldseek. The final rule calculates summary and detailed query-reference RBP-Score outputs.
 
-These complementary evidence layers are intended to be integrated into a scoring framework to prioritize candidate RBPs, where higher scores reflect stronger and more consistent support across the different analytical approaches. 
+\begin{figure}[htbp]
+\centering
+\resizebox{0.95\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=0.85cm,
+  box/.style={
+    rectangle,
+    draw,
+    rounded corners,
+    align=center,
+    minimum width=2.7cm,
+    minimum height=0.85cm,
+    font=\scriptsize
+  },
+  inputbox/.style={
+    rectangle,
+    draw,
+    rounded corners,
+    align=center,
+    minimum width=2.7cm,
+    minimum height=0.85cm,
+    font=\scriptsize
+  },
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
 
-In addition to the overall score, partial scores are derived from each analytical component (sequence similarity, evolutionary comparison and structural similarity), allowing the relative contribution of each evidence layer to be assessed. This enables a more informed interpretation of the results and supports transparent prioritization of candidate RBPs based on multiple complementary evidence layers.
+\node[inputbox] (input) {Query protein\\FASTA};
+\node[box, right=of input] (refs) {Curated RBP\\references +\\capsid outgroups};
+\node[box, right=of refs] (evidence) {Evidence layers\\BLASTp\\MUSCLE + FastTree\\ColabFold + Foldseek};
+\node[box, right=of evidence] (score) {Outgroup penalty\\+ weighted\\RBP-Score};
+\node[box, right=of score] (output) {Final ranking\\+ partial score\\inspection};
+
+\draw[arrow] (input) -- (refs);
+\draw[arrow] (refs) -- (evidence);
+\draw[arrow] (evidence) -- (score);
+\draw[arrow] (score) -- (output);
+
+\end{tikzpicture}%
+}
+\caption{Simplified overview of the RBP-Score workflow. Query proteins are analysed against curated RBP references and non-RBP capsid outgroups through sequence, phylogenetic and structural evidence layers. These components are combined with outgroup-based penalties to generate the final ranking while retaining partial scores for interpretation.}
+\label{fig:workflow}
+\end{figure}
+
+\subsection{Sequence similarity scoring}
+
+BLASTp was run against a database containing reference RBPs and capsid outgroups \cite{altschul1990}. Positive RBP hits were retained using configurable thresholds: e-value $\leq10^{-5}$, identity $\geq30\%$ and query coverage $\geq0.50$. Outgroup hits used relaxed filters to capture weak negative evidence: identity $\geq20\%$, alignment length $\geq10$ aa and e-value $\leq1000$.
+
+For each retained RBP hit, the raw sequence score combined four normalized terms:
+\begin{equation}
+S_{seq}=0.35S_{id}+0.30S_{cov}+0.25S_{bits}+0.10S_{eval}.
+\end{equation}
+Here, $S_{id}$ is identity divided by 100, $S_{cov}$ is alignment length divided by query length, $S_{bits}$ is the hit bitscore divided by the maximum RBP bitscore for that query, and $S_{eval}$ is the normalized contribution of the BLASTp e-value. The e-value component was transformed as:
+\begin{equation}
+L_e=-\log_{10}(e),\quad S_{eval}=\frac{\log(1+L_e)}{\log(1+L_{max})},
+\end{equation}
+where $e$ is the BLASTp e-value, $L_e$ is the negative log-transformed e-value, $S_{eval}$ is the normalized e-value score, and $L_{max}=150$ in the current configuration. E-values equal to zero were mapped to 1.0, non-informative e-values ($e\geq1$) to 0.0, and all values were clamped to [0,1]. This avoids treating all strong hits as identical while preserving the inverse logarithmic meaning of e-values, as illustrated by the transformation curve in Supplementary Fig.~\ref{fig:supp_eval}.
+
+\subsection{Phylogenetic scoring}
+
+Reference RBPs, queries and outgroups were concatenated into a global FASTA after identifier checks. Sequences were aligned with MUSCLE v5 \cite{edgar2022}. FastTree 2 was used to infer an approximately maximum-likelihood tree suitable for large alignments \cite{price2010}. The tree was then rooted using the common ancestor of the outgroup sequences.
+
+For each query-reference pair, phylogenetic support was calculated from tree distance:
+\begin{equation}
+S_{phylo}=\frac{1}{1+d},
+\end{equation}
+where $d$ is the tree distance between the query protein and a reference RBP. Shorter distances produce stronger phylogenetic support.
+
+\subsection{Structural scoring}
+
+Query structures were predicted with ColabFold using one model, one recycle and the mmseqs2\_uniref\_env MSA mode in the current configuration \cite{mirdita2022}. Predicted query structures were searched against precomputed RBP and outgroup PDB structures using Foldseek \cite{vankempen2024}. The structural score was:
+\begin{equation}
+S_{struct}=0.50S_{qTM}+0.30S_{alnTM}+0.20S_{RMSD},
+\end{equation}
+with
+\begin{equation}
+S_{RMSD}=\frac{1}{1+RMSD}.
+\end{equation}
+Here, $S_{qTM}$ represents the query-level TM-score, $S_{alnTM}$ represents the aligned-region TM-score, and $S_{RMSD}$ converts RMSD into a bounded similarity score. The higher weight assigned to query TM-score reflects global query-level structural similarity, while aligned-region TM-score and RMSD capture local agreement and structural deviation.
+
+\subsection{Outgroup penalty and final RBP-Score}
+
+For each query, the best outgroup match was identified independently for sequence, phylogenetic and structural evidence. Outgroup similarity was treated as negative evidence because a candidate RBP should be supported more strongly by known RBPs than by non-RBP capsid controls. The effective score for each component was:
+\begin{equation}
+S_{effective}=\max(0, S_{raw}-w_{penalty}S_{outgroup}).
+\end{equation}
+In this equation, $S_{raw}$ is the unpenalized component score, $S_{outgroup}$ is the best matching non-RBP outgroup score for the same evidence layer, and $w_{penalty}$ is the corresponding penalty weight. The penalty weights were 0.10 for BLASTp, 0.15 for phylogeny and 0.20 for structure.
+
+The final score was calculated as:
+\begin{equation}
+RBP\text{-}Score=0.35S_{seq}^{eff}+0.25S_{phylo}^{eff}+0.40S_{struct}^{eff}.
+\end{equation}
+These weights are exploratory and configurable. Sequence evidence is informative when direct homology exists, structural evidence receives the highest weight because fold conservation may persist despite sequence divergence, and phylogenetic evidence provides contextual support while remaining sensitive to alignment quality and protein modularity.
+
+\section{Results}
+
+\subsection{Dataset composition and phylogenetic input}
+
+This test run was designed to assess internal consistency and control behaviour, not to estimate predictive performance. The current run used 58 curated RBP references, 6 query/control sequences and 6 non-RBP capsid outgroups. The final global phylogenetic input therefore contained 70 sequences. This design allowed the same run to evaluate positive RBP support and negative capsid/outgroup behaviour within a single reproducible analysis.
+
+\subsection{Capsid outgroups formed a coherent non-RBP branch}
+
+The final capsid outgroup clustered as a coherent branch in the rooted global tree (Figure~\ref{fig:global_tree}). The outgroup-labelled query control also grouped in this region, as expected for a capsid protein. This result supports the use of homologous T4-like capsid proteins as non-RBP controls in this version of the pipeline.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth,height=0.43\textheight,keepaspectratio]{global_tree_rooted.png}
+\caption{Rooted global phylogenetic tree containing curated RBPs, query/control sequences and non-RBP capsid outgroups. The outgroup branch was composed of homologous T4-like capsid/major head proteins and was used for rooting and negative-evidence scoring.}
+\label{fig:global_tree}
+\end{figure}
+
+\subsection{Partial scores supported component-level interpretation}
+
+The detailed output retained raw and effective scores for every query-reference pair, together with the best sequence, phylogenetic and structural outgroup matches. This makes it possible to identify whether a ranking is supported by multiple evidence layers or driven by a single component. In the current test run, this was particularly relevant for interpreting the results shown in Table~\ref{tab:final_rbpscore}. Query5 ranked as the highest-scoring candidate, with an RBP-Score of 0.824, and combined a valid BLASTp hit with phylogenetic and structural support. Query1, in contrast, had no valid BLASTp hits but still reached an intermediate score of 0.318 due to structural similarity, showing why structural evidence should not be interpreted in isolation. Query6 behaved as expected for a capsid control: despite having structural hits, it was strongly deprioritized and obtained the lowest final score (0.088), consistent with the outgroup-based penalty described in Table~\ref{tab:supp_score_ranges}. Therefore, the partial components provide essential context for interpreting the final ranking rather than treating the RBP-Score as a standalone classification output.
+
+\subsection{Final ranking separated positive and non-RBP controls}
+
+The positive control ranked first with an RBP-Score of 0.974 (Table~\ref{tab:final_rbpscore}). Query5 was the highest-scoring candidate (0.824), supported by sequence, phylogenetic and structural effective scores of 0.921, 0.861 and 0.716, respectively. Query3 showed intermediate support (0.478), with moderate sequence, phylogenetic and structural contributions. Query4 had low support (0.188), mainly because it lacked valid BLASTp evidence. The random control ranked above query4 because it had no sequence support but showed moderate structural similarity. This does not mean that the random control should be interpreted as a confident RBP; rather, it illustrates why the final score should be reviewed together with the component-level evidence. The capsid control was strongly deprioritized (0.088), with a low effective structural score after outgroup penalization, consistent with the expected behaviour of the outgroup penalty. The complete decomposition of raw scores, penalty contributions and effective scores is provided in Supplementary Table~\ref{tab:supp_raw_effective_scores}.
+
+\begin{table}[htbp]
+\caption{Final RBP-Score ranking and effective partial scores for the current test run.}
+\label{tab:final_rbpscore}
+\centering
+\tiny
+\begin{tblr}{
+  width=0.98\textwidth,
+  colspec={|Q[c,m,wd=0.04\textwidth]|
+           Q[l,m,wd=0.06\textwidth]|
+           Q[c,m,wd=0.08\textwidth]|
+           Q[c,m,wd=0.14\textwidth]|
+           Q[c,m,wd=0.06\textwidth]|
+           Q[c,m,wd=0.06\textwidth]|
+           Q[c,m,wd=0.06\textwidth]|
+           Q[c,m,wd=0.06\textwidth]|
+           Q[c,m,wd=0.06\textwidth]|
+           Q[c,m,wd=0.09\textwidth]|},
+  hlines,
+  vlines,
+  row{1} = {font=\bfseries},
+  rows = {valign=m}
+}
+Rank & Query & Label & \makecell[c]{Best\\reference} & \makecell[c]{Seq.\\score} & \makecell[c]{Phylo.\\score} & \makecell[c]{Struct.\\score} & \makecell[c]{Final\\score} & \makecell[c]{BLAST\\hits} & \makecell[c]{Structural\\hits} \\
+1 & query2 & positive & YP\_654148.1 & 0.969 & 0.941 & 1.000 & 0.974 & 5 & 39 \\
+2 & \makecell[l]{query5} & candidate & YP\_003347556.1 & 0.921 & 0.861 & 0.716 & 0.824 & 1 & 39 \\
+3 & \makecell[l]{query3} & candidate & pdb\_00006iab & 0.620 & 0.426 & 0.386 & 0.478 & 1 & 49 \\
+4 & query1 & random & P12528 & 0.000 & 0.252 & 0.664 & 0.318 & 0 & 16 \\
+5 & \makecell[l]{query4} & candidate & pdb\_00005efv & 0.000 & 0.290 & 0.402 & 0.188 & 0 & 46 \\
+6 & query6 & outgroup & P49714 & 0.000 & 0.245 & 0.068 & 0.088 & 0 & 22 \\
+\end{tblr}
+\end{table}
+
+\section{Discussion}
+
+RBP-Score provides a reproducible prototype for RBP candidate prioritization rather than a definitive standalone predictor. Its main contribution is the integration of a curated database of experimentally validated RBPs with three complementary evidence layers: sequence homology, phylogenetic context and structure-level comparison. This is relevant because divergent phage RBPs may lack strong sequence conservation, while predicted structural similarity can still provide useful support \cite{jumper2021,mirdita2022,vankempen2024}. Therefore, the final score should be interpreted as a prioritization aid for downstream inspection, not as functional validation.
+
+Compared with existing RBP-oriented approaches, RBP-Score does not replace domain-based or machine-learning predictors, but complements them by preserving the contribution of each evidence layer. Previous tools have used profile HMMs and supervised classifiers to identify RBP sequences \cite{boeckaerts2022}, while recent structure-aware approaches highlight the value of structural interpretation for tail fiber proteins \cite{kleinSousa2025}. In this context, the main advantage of RBP-Score is not classification automation, but the integration of sequence, phylogenetic and structural evidence against a curated set of experimentally validated RBPs, while keeping partial scores available for manual inspection.
+
+The outgroup design was central to the implementation. Distant RBP-like proteins were unsuitable as negative controls because they may still be receptor-binding or tail-associated, whereas unrelated non-RBP proteins were too heterogeneous to align coherently. The T4-like capsid set was therefore used as a compromise: it is non-RBP, internally homologous and capable of forming a stable outgroup branch. This improves the interpretability of the outgroup penalty, although it remains a narrow negative-control family rather than a universal representation of all non-RBP phage proteins.
+
+The current weighting scheme remains exploratory. Structural evidence was weighted highest because fold-level similarity may be informative when sequence similarity is weak, but structural matches can also be non-specific when proteins share common architectural features. The score is not calibrated as a classifier and should not be treated as a probability. Larger validation sets with experimentally confirmed positive and negative proteins are required to estimate thresholds, tune weights, test alternative negative families and compare RBP-Score directly with existing RBP annotation tools \cite{boeckaerts2022,kleinSousa2025}. Despite these limitations, the separation between the positive control and the capsid control indicates that the scoring logic behaves consistently in this prototype setting.
+
+\section{Conclusion}
+
+RBP-Score provides a reproducible framework for prioritizing candidate phage RBPs by integrating BLASTp similarity, phylogenetic distance and Foldseek structural comparison. In the current test run, the positive control ranked highest, while the capsid control was strongly deprioritized by the outgroup penalty, supporting the internal consistency of the scoring strategy. Although the current implementation remains exploratory and requires broader validation before being used as a classifier, these results indicate that RBP-Score can provide a transparent basis for selecting candidate RBPs for manual inspection and downstream experimental validation.
+
+\newpage
+
+\appendix
+\renewcommand{\theHsection}{appendix.\Alph{section}}
+\renewcommand{\theHtable}{appendix.S\arabic{table}}
+\renewcommand{\theHfigure}{appendix.S\arabic{figure}}
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\section{Supplementary material}
+
+\begin{table}[H]
+\caption{Score components, transformations and value ranges used in the current RBP-Score implementation.}
+\label{tab:supp_score_ranges}
+\centering
+\scriptsize
+\begin{tblr}{
+  width=0.96\textwidth,
+  colspec={|Q[l,m,wd=0.20\textwidth]|Q[l,m,wd=0.39\textwidth]|Q[c,m,wd=0.12\textwidth]|Q[l,m,wd=0.20\textwidth]|},
+  hlines,
+  vlines,
+  row{1}={font=\bfseries},
+}
+Component & Transformation & Range & Interpretation \\
+BLAST identity & pident / 100 & 0--1 & Positive sequence evidence \\
+BLAST coverage & alignment length / query length & 0--1 & Positive sequence evidence \\
+BLAST bitscore & bitscore / maximum RBP bitscore for that query & 0--1 & Positive sequence evidence \\
+BLAST e-value & log1p(-log10(e-value)) / log1p(150); e-value <= 0 mapped to 1 & 0--1 & Positive sequence evidence \\
+Sequence score & 0.35 identity + 0.30 coverage + 0.25 bitscore + 0.10 e-value & 0--1 & Raw sequence component \\
+Phylogeny score & 1 / (1 + tree distance) & 0--1 & Raw evolutionary component \\
+Structural score & 0.50 qTM-score + 0.30 alnTM-score + 0.20 [1/(1+RMSD)] & 0--1 & Raw structural component \\
+Outgroup penalty & effective component = raw component - penalty weight x best outgroup score & 0--1 after clamping & Negative evidence \\
+Final RBP-Score & 0.35 effective sequence + 0.25 effective phylogeny + 0.40 effective structure & 0--1 & Integrated prioritization score \\
+\end{tblr}
+\end{table}
+
+\begin{table}[H]
+\caption{Raw scores, outgroup penalty contributions and effective scores used to calculate the final RBP-Score.}
+\label{tab:supp_raw_effective_scores}
+\centering
+\scriptsize
+\begin{tblr}{
+  width=\textwidth,
+  colsep=2pt,
+  rowsep=1.4pt,
+  colspec={|Q[c,m,wd=0.08\textwidth]|
+           Q[c,m,wd=0.1\textwidth]|
+           Q[c,m,wd=0.070\textwidth]|
+           Q[c,m,wd=0.065\textwidth]|
+           Q[c,m,wd=0.065\textwidth]|
+           Q[c,m,wd=0.070\textwidth]|
+           Q[c,m,wd=0.065\textwidth]|
+           Q[c,m,wd=0.065\textwidth]|
+           Q[c,m,wd=0.070\textwidth]|
+           Q[c,m,wd=0.065\textwidth]|
+           Q[c,m,wd=0.065\textwidth]|
+           Q[c,m,wd=0.090\textwidth]|},
+  hlines,
+  vlines,
+  row{1} = {font=\bfseries},
+  row{2} = {font=\bfseries},
+  rows = {valign=m, halign=c}
+}
+\SetCell[r=2]{c} Rank &
+\SetCell[r=2]{c} Query &
+\SetCell[c=3]{c} Sequence &
+&
+&
+\SetCell[c=3]{c} Phylogeny &
+&
+&
+\SetCell[c=3]{c} Structure &
+&
+&
+\SetCell[r=2]{c} Final \\
+&
+&
+Raw & Pen. & Eff. &
+Raw & Pen. & Eff. &
+Raw & Pen. & Eff. &
+\\
+1 & query2 & 1.000 & 0.031 & 0.969 & 1.000 & 0.059 & 0.941 & 1.000 & 0.000 & 1.000 & 0.974 \\
+2 & query5 & 0.953 & 0.032 & 0.921 & 0.904 & 0.043 & 0.861 & 0.752 & 0.035 & 0.716 & 0.824 \\
+3 & query3 & 0.670 & 0.050 & 0.620 & 0.462 & 0.036 & 0.426 & 0.427 & 0.042 & 0.386 & 0.478 \\
+4 & query1 & 0.000 & 0.000 & 0.000 & 0.312 & 0.060 & 0.252 & 0.664 & 0.000 & 0.664 & 0.318 \\
+5 & query4 & 0.000 & 0.000 & 0.000 & 0.320 & 0.030 & 0.290 & 0.443 & 0.040 & 0.402 & 0.188 \\
+6 & query6 & 0.000 & 0.000 & 0.000 & 0.395 & 0.150 & 0.245 & 0.268 & 0.200 & 0.068 & 0.088 \\
+\end{tblr}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.66\textwidth]{eval_transform.png}
+\caption{Behaviour of the e-value transformation used in the sequence score. The x-axis is logarithmic and reversed from weak to strong BLASTp evidence. Lower e-values produce higher $S_{eval}$ values, while non-informative e-values are mapped to 0.}
+\label{fig:supp_eval}
+\end{figure}
+
+
+\newpage
 
 \printbibliography
 
