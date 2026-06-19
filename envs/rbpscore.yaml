@@ -1,0 +1,23 @@
+name: rbpscore
+
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - python=3.11
+  - blast
+  - muscle
+  - fasttree
+  - foldseek
+  - hmmer
+  - biopython
+  - pandas
+  - pyyaml
+  - matplotlib
+  - networkx
+  - pip
+
+  - pip:
+      - snakemake
