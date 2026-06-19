@@ -39,3 +39,6 @@ outgroup_filters:
   min_identity: 20.0
   min_length: 10
   max_evalue: 1000.0
+
+normalization:
+  evalue_max_log: 150.0
