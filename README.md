@@ -65,6 +65,8 @@ RBP-Score/
 │   ├── RBP_Score_pipeline_for_phage_RBPs_1.pdf
 │   ├── Script_Projeto.odt
 │   └── Tema Projeto em Bioinformatica_SBS(2026).pdf
+├── envs/
+│   └── rbpscore.yaml
 ├── reference_structures/
 │   ├── input_fastas/
 │   └── pdb/
@@ -179,6 +181,62 @@ These weights are configurable and exploratory in the current prototype.
 
 ---
 
+## Conda environment
+
+The repository includes a Conda environment file in:
+
+```text
+envs/rbpscore.yaml
+```
+
+This environment is intended to make the pipeline easier to reproduce by installing the main command-line and Python dependencies used by the workflow.
+
+To create the environment from the repository root, run:
+
+```bash
+conda env create -f envs/rbpscore.yaml
+```
+
+Then activate it with:
+
+```bash
+conda activate rbpscore
+```
+
+The current environment file defines:
+
+```yaml
+name: rbpscore
+
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - python=3.11
+  - blast
+  - muscle
+  - fasttree
+  - foldseek
+  - hmmer
+  - biopython
+  - pandas
+  - pyyaml
+  - matplotlib
+  - networkx
+  - pip
+
+  - pip:
+      - snakemake
+```
+
+This environment includes Python 3.11, BLAST, MUSCLE, FastTree, Foldseek, HMMER, Biopython, pandas, PyYAML, matplotlib, NetworkX and Snakemake.
+
+> **Note:** ColabFold is used by the workflow for query structure prediction, but it is not installed by the current `envs/rbpscore.yaml` file. If running the structural prediction step, make sure ColabFold is installed separately or available in the execution environment.
+
+---
+
 ## Pipeline overview
 
 The Snakemake workflow is defined in:
@@ -263,7 +321,14 @@ The final score should be interpreted as a prioritisation score, not as a probab
 
 ## Running the workflow
 
-From the repository root:
+First create and activate the Conda environment:
+
+```bash
+conda env create -f envs/rbpscore.yaml
+conda activate rbpscore
+```
+
+From the repository root, run the workflow with:
 
 ```bash
 snakemake -s workflow/snakefile --cores 1
@@ -275,23 +340,13 @@ For a dry run:
 snakemake -s workflow/snakefile --cores 1 -n
 ```
 
-For a more complete run using available CPU cores:
+For a more complete run using all available CPU cores:
 
 ```bash
 snakemake -s workflow/snakefile --cores all
 ```
 
-External tools required by the workflow include:
-
-- Python 3;
-- Snakemake;
-- BLAST+;
-- MUSCLE;
-- FastTree;
-- ColabFold;
-- Foldseek.
-
-The exact installation method is not currently formalised in this repository, so users should ensure these tools are available in the execution environment before running the pipeline.
+The Conda environment provides the main dependencies required by the workflow, including BLAST, MUSCLE, FastTree, Foldseek, HMMER and Snakemake. ColabFold should be installed or made available separately if the structure prediction rules are executed.
 
 ---
 
